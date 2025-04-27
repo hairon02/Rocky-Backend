@@ -9,7 +9,7 @@ movimientoFinanciero = APIRouter()
 
 @movimientoFinanciero.get("/movimientoFinanciero", response_model=list[MovimientoFinanciero])
 def get_movimientos_financieros():
-    result = conn.execute(movimiento_financiero.select()).fetchall()
+    result = conn.execute(movimiento_financiero.select().order_by(movimiento_financiero.c.fecha)).fetchall()
     movimientos_list = [row._mapping for row in result]
     return movimientos_list
 
