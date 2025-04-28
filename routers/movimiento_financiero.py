@@ -112,3 +112,41 @@ def calcular_estado_financiero(
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error interno: {str(e)}")
+
+@movimientoFinanciero.get("/resumen_mensual")
+def resumen_mensual(usuario_id: int, anio: int, mes: int):
+    try:
+        # Calcular el rango de fechas del mes
+        fecha_inicio = date(anio, mes, 1)
+        if mes == 12:
+            fecha_fin = date(anio + 1, 1, 1)
+        else:
+            fecha_fin = date(anio, mes + 1, 1)
+
+        query = movimiento_financiero.select().where(
+            movimiento_financiero.c.usuario_id == usuario_id,
+            movimiento_financiero.c.fecha >= fecha_inicio,
+            movimiento_financiero.c.fecha < fecha_fin
+        )
+
+        movimientos = conn.execute(query).fetchall()
+
+        if not movimientos:
+            raise HTTPException(status_code=404, detail="No se encontraron movimientos para este mes.")
+
+        ingresos = sum(m._mapping["monto_real"] for m in movimientos if m._mapping["tipo"] == "ingreso")
+        egresos = sum(m._mapping["monto_real"] for m in movimientos if m._mapping["tipo"] == "egreso")
+        saldo = ingresos - egresos
+
+        return {
+            "usuario_id": usuario_id,
+            "mes": mes,
+            "anio": anio,
+            "total_ingresos": ingresos,
+            "total_egresos": egresos,
+            "saldo_final": saldo
+        }
+
+    except Exception as e:
+        print(f"Error: {e}")
+        raise HTTPException(status_code=500, detail=f"Error interno: {str(e)}")
