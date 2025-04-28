@@ -5,6 +5,8 @@ from schemas.movimiento_financiero import MovimientoFinanciero, MovimientoFinanc
 from starlette.status import HTTP_204_NO_CONTENT
 from datetime import date
 from typing import Optional
+from sqlalchemy import asc
+
 movimientoFinanciero = APIRouter()
 
 
@@ -150,3 +152,38 @@ def resumen_mensual(usuario_id: int, anio: int, mes: int):
     except Exception as e:
         print(f"Error: {e}")
         raise HTTPException(status_code=500, detail=f"Error interno: {str(e)}")
+
+
+@movimientoFinanciero.get("/progreso_financiero")
+def get_progreso_financiero(usuario_id: int, fecha_inicio: date, fecha_fin: date):
+    # Obtener los movimientos del usuario dentro del rango de fechas
+    query = movimiento_financiero.select().where(
+        movimiento_financiero.c.usuario_id == usuario_id,
+        movimiento_financiero.c.fecha >= fecha_inicio,
+        movimiento_financiero.c.fecha <= fecha_fin
+    ).order_by(asc(movimiento_financiero.c.fecha))
+
+    movimientos = conn.execute(query).fetchall()
+
+    if not movimientos:
+        raise HTTPException(status_code=404, detail="No se encontraron movimientos financieros en el rango de fechas.")
+
+    # Calcular saldo acumulado
+    saldo = 0
+    progreso = []
+    for movimiento in movimientos:
+        movimiento = movimiento._mapping
+        if movimiento['tipo'].lower() == "ingreso":
+            saldo += movimiento['monto_real']
+        elif movimiento['tipo'].lower() == "egreso":
+            saldo -= movimiento['monto_real']
+
+        progreso.append({
+            "fecha": movimiento['fecha'],
+            "saldo": saldo
+        })
+
+    return {
+        "usuario_id": usuario_id,
+        "progreso": progreso
+    }
