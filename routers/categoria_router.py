@@ -22,7 +22,10 @@ def create_categoria(cat: Categoria):
         "categoria": cat.categoria
     }
     result = conn.execute (categoria.insert().values(nuevo))
-    return result
+    conn.commit()
+
+    categoriaOne = conn.execute(categoria.select().where(categoria.c.id == result.lastrowid)).first()._mapping
+    return categoriaOne
 
 @categoria_router.get("/categoria/{id}", response_model=Categoria)
 def get_UnoCategoria(id:int):
