@@ -1,7 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routers.movimiento_financiero import movimientoFinanciero
-
+from routers.user import user
+from routers.categoria_router import categoria_router
+from auth import auth
 app = FastAPI(
     title="Rocky API",
     description="a REST API using python and mysql",
@@ -16,6 +18,10 @@ app.add_middleware(
 )
 
 app.include_router(movimientoFinanciero, tags=["movimientoFinanciero"])
+app.include_router(user, tags=["Users"])
+app.include_router(auth, tags=["Auth"])
+app.include_router(categoria_router, tags=["Categoria"])
+
 @app.get("/")
 async def root():
     return "hola"
