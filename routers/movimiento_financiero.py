@@ -10,9 +10,9 @@ from sqlalchemy import asc
 movimientoFinanciero = APIRouter()
 
 
-@movimientoFinanciero.get("/movimientoFinanciero", response_model=list[MovimientoFinanciero])
-def get_movimientos_financieros():
-    result = conn.execute(movimiento_financiero.select().order_by(movimiento_financiero.c.fecha)).fetchall()
+@movimientoFinanciero.get("/movimientoFinanciero/list/{id}", response_model=list[MovimientoFinanciero])
+def get_movimientos_financieros(id : int):
+    result = conn.execute(movimiento_financiero.select().where(movimiento_financiero.c.usuario_id == id).order_by(movimiento_financiero.c.fecha)).fetchall()
     movimientos_list = [row._mapping for row in result]
     return movimientos_list
 
@@ -20,6 +20,7 @@ def get_movimientos_financieros():
 def create_movimientoFinanciero(movimiento: MovimientoFinancieroBase):
     nuevo_movimiento = {
         "usuario_id": movimiento.usuario_id,
+        "categoria_id": movimiento.categoria_id,
         "fecha": movimiento.fecha,
         "tipo": movimiento.tipo,
         "concepto": movimiento.concepto,
@@ -49,6 +50,7 @@ def get_movimientoFinanciero(id: int):
 def update(id: int, movimiento: MovimientoFinancieroBase):
     result = conn.execute(movimiento_financiero.update().values(
                                             usuario_id = movimiento.usuario_id,
+                                            categoria_id = movimiento.categoria_id,
                                             fecha = movimiento.fecha,
                                             tipo = movimiento.tipo,
                                             concepto = movimiento.concepto,

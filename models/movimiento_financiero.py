@@ -5,6 +5,7 @@ from config.db import meta, engine
 movimiento_financiero = Table("movimiento_financiero", meta, 
     Column("id", Integer, primary_key=True, autoincrement=True), 
     Column("usuario_id", Integer),
+    Column("categoria_id", Integer, default=0),
     Column("fecha", Date),
     Column("tipo", String(10)),
     Column("concepto", Text),
