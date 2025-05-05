@@ -5,6 +5,7 @@ from fastapi import Query
 
 class MovimientoFinancieroBase(BaseModel):
     usuario_id: int | None = None
+    categoria_id: int
     fecha: date 
     tipo: str 
     concepto: str
