@@ -11,6 +11,10 @@ class MovimientoFinancieroBase(BaseModel):
     concepto: str
     monto_presupuestado: float 
     monto_real: float 
+
+    class Config:
+        from_attributes = True
+
     
 class MovimientoFinanciero(MovimientoFinancieroBase):
     id: int
@@ -21,3 +25,6 @@ class EstadoFinancieroResponse(BaseModel):
     total_ingresos: float
     total_egresos: float
     saldo_final: float
+
+    class Config:
+        from_attributes = True
