@@ -111,8 +111,8 @@ def get_user_by_username(user: str):
 
     raise HTTPException(status_code=404, detail="Item not found")
 
-@user.get("/users/get_user_by_email/{Email}", response_model=User)
-def get_user_by_email(email: str):
+@user.get("/users/get_user_by_email/{email}", response_model=User)
+def get_user_by_email(email: str): # El nombre del parámetro ya coincide
     with Session() as session:
         result = session.execute(users.select().where(users.c.email == email)).first()
         if result:
