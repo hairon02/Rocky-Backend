@@ -28,3 +28,11 @@ engine = create_engine(database_url)
 Session = sessionmaker(bind=engine)
 meta = MetaData()
 conn = engine.connect()
+
+
+def get_db():
+    db = Session()
+    try:
+        yield db
+    finally:
+        db.close()
