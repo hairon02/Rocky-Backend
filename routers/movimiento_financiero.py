@@ -31,13 +31,17 @@ def create_movimientoFinanciero(movimiento: MovimientoFinancieroBase):
     }
     print("Insertando:", nuevo_movimiento)
 
-    result = conn.execute(movimiento_financiero.insert().values(nuevo_movimiento))
+    # Modificación clave: Usar returning() para obtener la fila insertada directamente
+    insert_statement = movimiento_financiero.insert().values(nuevo_movimiento).returning(movimiento_financiero.c.id)
+    result = conn.execute(insert_statement)
     conn.commit()
 
-    if result.rowcount == 0:
+    inserted_id = result.fetchone()[0]
+
+    if not inserted_id:
         raise HTTPException(status_code=404, detail="Item not found") 
     
-    movimientoFinanciero = conn.execute(movimiento_financiero.select().where(movimiento_financiero.c.id == result.lastrowid)).first()._mapping
+    movimientoFinanciero = conn.execute(movimiento_financiero.select().where(movimiento_financiero.c.id == inserted_id)).first()._mapping
     return movimientoFinanciero
    
 
