@@ -5,16 +5,18 @@ from schemas.movimiento_financiero import MovimientoFinanciero, MovimientoFinanc
 from starlette.status import HTTP_204_NO_CONTENT
 from datetime import date
 from typing import Optional
-from sqlalchemy import asc
+from sqlalchemy import asc, desc
+from config.db import engine
 
 movimientoFinanciero = APIRouter()
 
 
 @movimientoFinanciero.get("/movimientoFinanciero/list/{id}", response_model=list[MovimientoFinanciero])
 def get_movimientos_financieros(id : int):
-    result = conn.execute(movimiento_financiero.select().where(movimiento_financiero.c.usuario_id == id).order_by(movimiento_financiero.c.fecha)).fetchall()
-    movimientos_list = [row._mapping for row in result]
-    return movimientos_list
+    with engine.connect() as conn:
+        result = conn.execute(movimiento_financiero.select().where(movimiento_financiero.c.usuario_id == id).order_by(desc(movimiento_financiero.c.fecha))).fetchall()
+        movimientos_list = [row._mapping for row in result]
+        return movimientos_list
 
 @movimientoFinanciero.post("/movimientoFinanciero", response_model = MovimientoFinanciero)
 def create_movimientoFinanciero(movimiento: MovimientoFinancieroBase):
@@ -165,7 +167,8 @@ def get_progreso_financiero(usuario_id: int, fecha_inicio: date, fecha_fin: date
         movimiento_financiero.c.fecha <= fecha_fin
     ).order_by(asc(movimiento_financiero.c.fecha))
 
-    movimientos = conn.execute(query).fetchall()
+    with engine.connect() as conn:
+        movimientos = conn.execute(query).fetchall()
 
     if not movimientos:
         raise HTTPException(status_code=404, detail="No se encontraron movimientos financieros en el rango de fechas.")
