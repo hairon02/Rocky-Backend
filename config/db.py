@@ -6,19 +6,26 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# La URL de la base de datos se toma directamente de las variables de entorno.
-# Asegúrate de que en Render esta URL ya incluye ?sslmode=require al final.
 database_url = os.getenv("DATABASE_URL")
+engine_options = {}
 
+# Asegurarse de que la URL sea compatible con SQLAlchemy y psycopg2
 if database_url and database_url.startswith("postgres://"):
-    # Reemplaza el dialecto para que SQLAlchemy use psycopg2
     database_url = database_url.replace("postgres://", "postgresql+psycopg2://", 1)
+    
+    # ¡Esta es la parte crucial!
+    # Forzamos explícitamente el modo SSL a través de los argumentos de conexión.
+    # Esto tiene mayor precedencia y es más confiable que ponerlo en la URL.
+    engine_options['connect_args'] = {
+        'sslmode': 'require'
+    }
 
-engine = create_engine(database_url)
+# Crear el motor de la base de datos con las opciones explícitas
+engine = create_engine(database_url, **engine_options)
+
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 meta = MetaData()
 
-# Función para obtener una sesión de base de datos por petición
 def get_db():
     db = SessionLocal()
     try:
