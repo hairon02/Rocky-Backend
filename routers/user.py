@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Response, status, HTTPException, Depends
-from config.db import conn
+from config.db import conn, Session
 from models.user import users
 from schemas.user import User
 from passlib.context import CryptContext
@@ -111,12 +111,12 @@ def get_user_by_username(user: str):
 
     raise HTTPException(status_code=404, detail="Item not found")
 
-
 @user.get("/users/get_user_by_email/{Email}", response_model=User)
 def get_user_by_email(email: str):
-    user = conn.execute(users.select().where(users.c.email == email)).first()
-    if user:
-        user_dict = dict(user._asdict())
-        return user_dict
+    with Session() as session:
+        result = session.execute(users.select().where(users.c.email == email)).first()
+        if result:
+            user_dict = dict(result._mapping)
+            return user_dict
 
     raise HTTPException(status_code=404, detail="Item not found")

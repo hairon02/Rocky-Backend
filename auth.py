@@ -8,7 +8,7 @@ from jwt.exceptions import InvalidTokenError
 from passlib.context import CryptContext
 from pydantic import BaseModel
 from schemas.user import User
-from config.db import conn
+from config.db import conn, Session
 from models.user import users
 # Configuración de JWT
 #Clave secreta para firmar los tokens JWT
@@ -46,10 +46,11 @@ def get_user(username: str):
     return None
 
 def get_user_by_email(email: str):
-    user = conn.execute(users.select().where(users.c.email == email)).first()
-    if user:
-        return user._mapping
-    return None
+    with Session() as session:
+        result = session.execute(users.select().where(users.c.email == email)).first()
+        if result:
+            return result._mapping  # o dict(result._mapping) si esperas un dict
+        return None
 
 def authenticate_user(email: str, password: str):
     user = get_user_by_email(email)
