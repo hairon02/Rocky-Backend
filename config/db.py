@@ -5,14 +5,15 @@ from sqlalchemy.orm import sessionmaker
 
 load_dotenv()
 
-# Usar la variable DATABASE_URL que Render proporciona.
-# Si no existe (para desarrollo local), construye la URL a partir de las otras variables.
 database_url = os.getenv("DATABASE_URL")
-if not database_url:
+
+# Si estamos en producción (la URL de Render existe), añadimos el parámetro sslmode.
+if database_url and database_url.startswith("postgres://"):
+    database_url = database_url + "?sslmode=require"
+elif not database_url:
     # Lógica para desarrollo local (si aún quieres usar MySQL localmente)
-    # Asegúrate de tener un .env local para esto.
     user = os.getenv("USER")
-    password = os.getenv("PASSWORD", "") # Añade PASSWORD a tu .env local
+    password = os.getenv("PASSWORD", "")
     host = os.getenv("DATABASE_HOST")
     port = os.getenv("DATABASE_PORT")
     name = os.getenv("DATABASE_NAME")
