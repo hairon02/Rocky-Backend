@@ -1,17 +1,24 @@
 from sqlalchemy import create_engine, MetaData
+from sqlalchemy.orm import sessionmaker
 import os
 from dotenv import load_dotenv
-from sqlalchemy.orm import sessionmaker
 
 load_dotenv()
 
 database_url = os.getenv("DATABASE_URL")
 
-# Si estamos en producción (la URL de Render existe), añadimos el parámetro sslmode.
-if database_url and database_url.startswith("postgres://"):
-    database_url = database_url + "?sslmode=require"
-elif not database_url:
-    # Lógica para desarrollo local (si aún quieres usar MySQL localmente)
+if database_url:
+    # Render te da postgres://... pero SQLAlchemy necesita postgresql+psycopg2://...
+    if database_url.startswith("postgres://"):
+        database_url = database_url.replace("postgres://", "postgresql+psycopg2://", 1)
+
+    # Asegura que sslmode=require esté presente
+    if "sslmode=" not in database_url:
+        separator = "&" if "?" in database_url else "?"
+        database_url += f"{separator}sslmode=require"
+
+else:
+    # Configuración local con MySQL
     user = os.getenv("USER")
     password = os.getenv("PASSWORD", "")
     host = os.getenv("DATABASE_HOST")
@@ -19,8 +26,8 @@ elif not database_url:
     name = os.getenv("DATABASE_NAME")
     database_url = f"mysql+pymysql://{user}:{password}@{host}:{port}/{name}"
 
+# Crear el motor SQLAlchemy
 engine = create_engine(database_url)
-
 Session = sessionmaker(bind=engine)
 meta = MetaData()
 conn = engine.connect()
