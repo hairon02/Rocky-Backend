@@ -7,8 +7,9 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jwt.exceptions import InvalidTokenError
 from passlib.context import CryptContext
 from pydantic import BaseModel
+from sqlalchemy.orm import Session as ss
 from schemas.user import User
-from config.db import conn, Session
+from config.db import conn, Session,get_db
 from models.user import users
 # Configuración de JWT
 #Clave secreta para firmar los tokens JWT
@@ -72,7 +73,7 @@ def create_access_token(data: dict, expires_delta: Union[timedelta, None] = None
     return encoded_jwt
 
 # Obtener el usuario actual desde el token
-async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]):
+async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)], db: ss = Depends(get_db)):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -93,8 +94,7 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]):
 
 # Verificar si el usuario está activo
 async def get_current_active_user(current_user: Annotated[User, Depends(get_current_user)],):
-    if 'activo' in current_user and not current_user['activo']:
-        raise HTTPException(status_code=400, detail="Usuario inactivo")
+
     return current_user
 
 # Endpoint para el login
