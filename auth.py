@@ -7,9 +7,9 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jwt.exceptions import InvalidTokenError
 from passlib.context import CryptContext
 from pydantic import BaseModel
-from sqlalchemy.orm import Session as ss
+from sqlalchemy.orm import Session
 from schemas.user import User
-from config.db import conn, Session,get_db
+from config.db import engine ,get_db, conn
 from models.user import users
 # Configuración de JWT
 #Clave secreta para firmar los tokens JWT
@@ -46,15 +46,14 @@ def get_user(username: str):
         return user._mapping
     return None
 
-def get_user_by_email(email: str):
-    with Session() as session:
-        result = session.execute(users.select().where(users.c.email == email)).first()
-        if result:
-            return dict(result._mapping)
-    raise HTTPException(status_code=404, detail="Item not found")
+def get_user_by_email_from_db(db: Session, email: str):
+    user = db.execute(users.select().where(users.c.email == email)).first()
+    if user:
+        return user._mapping
+    return None
 
-def authenticate_user(email: str, password: str):
-    user = get_user_by_email(email)
+def authenticate_user(db: Session, email: str, password: str):
+    user = get_user_by_email_from_db(db, email)
     if not user:
         return False
     if not verify_password(password, user['password']):
@@ -101,8 +100,9 @@ async def get_current_active_user(current_user: Annotated[User, Depends(get_curr
 @auth.post("/token")
 async def login_for_access_token(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
+    db: Session = Depends(get_db) # Inyecta la sesión de la BD
 ) -> Token:
-    user = authenticate_user(form_data.username, form_data.password)
+    user = authenticate_user(db, form_data.username, form_data.password) # Pasa la sesión a la función
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

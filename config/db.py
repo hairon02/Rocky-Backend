@@ -6,30 +6,21 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# La URL de la base de datos se toma directamente de las variables de entorno.
+# Asegúrate de que en Render esta URL ya incluye ?sslmode=require al final.
 database_url = os.getenv("DATABASE_URL")
-engine_args = {}
 
 if database_url and database_url.startswith("postgres://"):
+    # Reemplaza el dialecto para que SQLAlchemy use psycopg2
     database_url = database_url.replace("postgres://", "postgresql+psycopg2://", 1)
-    # Forzar el modo SSL 'require' para la conexión a Render
-    engine_args['connect_args'] = {'sslmode': 'require'}
-elif not database_url:
-    # Si DATABASE_URL no está definida, construye la URL para MySQL
-    user = os.getenv("USER")
-    password = os.getenv("PASSWORD", "")
-    host = os.getenv("DATABASE_HOST")
-    port = os.getenv("DATABASE_PORT")
-    name = os.getenv("DATABASE_NAME")
-    database_url = f"mysql+pymysql://{user}:{password}@{host}:{port}/{name}"
 
-# Crear el motor de la base de datos con los argumentos
-engine = create_engine(database_url, **engine_args)
-Session = sessionmaker(bind=engine)
+engine = create_engine(database_url)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 meta = MetaData()
-conn = engine.connect()
 
+# Función para obtener una sesión de base de datos por petición
 def get_db():
-    db = Session()
+    db = SessionLocal()
     try:
         yield db
     finally:
