@@ -49,8 +49,8 @@ def get_user_by_email(email: str):
     with Session() as session:
         result = session.execute(users.select().where(users.c.email == email)).first()
         if result:
-            return result._mapping  # o dict(result._mapping) si esperas un dict
-        return None
+            return dict(result._mapping)
+    raise HTTPException(status_code=404, detail="Item not found")
 
 def authenticate_user(email: str, password: str):
     user = get_user_by_email(email)
