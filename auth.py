@@ -1,6 +1,6 @@
+# auth.py
 from datetime import datetime, timedelta, timezone
-from typing import Union
-from typing_extensions import Annotated
+from typing import Union, Annotated
 import jwt
 from fastapi import Depends, HTTPException, status, APIRouter
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
@@ -9,22 +9,20 @@ from passlib.context import CryptContext
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from schemas.user import User
-from config.db import engine ,get_db, conn
+from config.db import get_db  # Importamos la función para obtener la sesión
 from models.user import users
+
 # Configuración de JWT
-#Clave secreta para firmar los tokens JWT
 SECRET_KEY = "2378c6013ee00036936669c834304c098a0ffbe2f148859bc47aed4473a1164d"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 # Configuración de Passlib (bcrypt)
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-
 auth = APIRouter()
 
-# Modelo de Pydantic que se usará en el endpoint de token para el response
+# --- Modelos Pydantic ---
 class Token(BaseModel):
     access_token: str
     token_type: str
@@ -32,35 +30,36 @@ class Token(BaseModel):
 class TokenData(BaseModel):
     username: Union[str, None] = None
 
-
-# Funciones de hashing
+# --- Funciones de Utilidad ---
 def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
 
 def get_password_hash(password):
     return pwd_context.hash(password)
 
-def get_user(username: str):
-    user = conn.execute(users.select().where(users.c.username == username)).first()
+# --- Funciones de Base de Datos ---
+# CORREGIDO: Ahora aceptan 'db: Session'
+def get_user(db: Session, username: str):
+    user = db.execute(users.select().where(users.c.username == username)).first()
     if user:
         return user._mapping
     return None
 
-def get_user_by_email_from_db(db: Session, email: str):
+def get_user_by_email(db: Session, email: str):
     user = db.execute(users.select().where(users.c.email == email)).first()
     if user:
         return user._mapping
     return None
 
 def authenticate_user(db: Session, email: str, password: str):
-    user = get_user_by_email_from_db(db, email)
+    user = get_user_by_email(db, email)
     if not user:
         return False
     if not verify_password(password, user['password']):
         return False
     return user
 
-# Creación de tokens JWT
+# --- Creación de Tokens ---
 def create_access_token(data: dict, expires_delta: Union[timedelta, None] = None):
     to_encode = data.copy()
     if expires_delta:
@@ -71,8 +70,9 @@ def create_access_token(data: dict, expires_delta: Union[timedelta, None] = None
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-# Obtener el usuario actual desde el token
-async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)], db: ss = Depends(get_db)):
+# --- Dependencias de FastAPI ---
+# CORREGIDO: Ahora inyecta la sesión de la BD y la pasa a 'get_user'
+async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)], db: Session = Depends(get_db)):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -86,23 +86,24 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)], db: ss
         token_data = TokenData(username=username)
     except InvalidTokenError:
         raise credentials_exception
-    user = get_user(username=token_data.username)
+    
+    # Usa la sesión 'db' inyectada para la consulta
+    user = get_user(db, username=token_data.username)
     if user is None:
         raise credentials_exception
     return user
 
-# Verificar si el usuario está activo
-async def get_current_active_user(current_user: Annotated[User, Depends(get_current_user)],):
-
+async def get_current_active_user(current_user: Annotated[User, Depends(get_current_user)]):
+    # Aquí podrías añadir lógica para verificar si el usuario está activo (p.ej. un campo 'disabled' en la BD)
     return current_user
 
-# Endpoint para el login
-@auth.post("/token")
+# --- Endpoints de la API ---
+@auth.post("/token", response_model=Token)
 async def login_for_access_token(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
-    db: Session = Depends(get_db) # Inyecta la sesión de la BD
-) -> Token:
-    user = authenticate_user(db, form_data.username, form_data.password) # Pasa la sesión a la función
+    db: Session = Depends(get_db)
+):
+    user = authenticate_user(db, form_data.username, form_data.password)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

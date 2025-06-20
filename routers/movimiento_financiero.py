@@ -1,87 +1,69 @@
-from fastapi import APIRouter, Response, status, HTTPException, Query
-from config.db import conn
+# routers/movimiento_financiero.py
+from fastapi import APIRouter, Response, status, HTTPException, Query, Depends
+from sqlalchemy.orm import Session
+from config.db import get_db, engine
 from models.movimiento_financiero import movimiento_financiero
 from schemas.movimiento_financiero import MovimientoFinanciero, MovimientoFinancieroBase, EstadoFinancieroResponse
 from starlette.status import HTTP_204_NO_CONTENT
 from datetime import date
 from typing import Optional
 from sqlalchemy import asc, desc
-from config.db import engine
 
 movimientoFinanciero = APIRouter()
 
-
 @movimientoFinanciero.get("/movimientoFinanciero/list/{id}", response_model=list[MovimientoFinanciero])
-def get_movimientos_financieros(id : int):
-    with engine.connect() as conn:
-        result = conn.execute(movimiento_financiero.select().where(movimiento_financiero.c.usuario_id == id).order_by(desc(movimiento_financiero.c.fecha))).fetchall()
-        movimientos_list = [row._mapping for row in result]
-        return movimientos_list
+def get_movimientos_financieros(id: int, db: Session = Depends(get_db)):
+    result = db.execute(movimiento_financiero.select().where(movimiento_financiero.c.usuario_id == id).order_by(desc(movimiento_financiero.c.fecha))).fetchall()
+    movimientos_list = [row._mapping for row in result]
+    return movimientos_list
 
-@movimientoFinanciero.post("/movimientoFinanciero", response_model = MovimientoFinanciero)
-def create_movimientoFinanciero(movimiento: MovimientoFinancieroBase):
-    nuevo_movimiento = {
-        "usuario_id": movimiento.usuario_id,
-        "categoria_id": movimiento.categoria_id,
-        "fecha": movimiento.fecha,
-        "tipo": movimiento.tipo,
-        "concepto": movimiento.concepto,
-        "monto_presupuestado": movimiento.monto_presupuestado,
-        "monto_real": movimiento.monto_real
-    }
-    print("Insertando:", nuevo_movimiento)
-
-    # Modificación clave: Usar returning() para obtener la fila insertada directamente
-    insert_statement = movimiento_financiero.insert().values(nuevo_movimiento).returning(movimiento_financiero.c.id)
-    result = conn.execute(insert_statement)
-    conn.commit()
-
-    inserted_id = result.fetchone()[0]
-
-    if not inserted_id:
-        raise HTTPException(status_code=404, detail="Item not found") 
+@movimientoFinanciero.post("/movimientoFinanciero", response_model=MovimientoFinanciero)
+def create_movimientoFinanciero(movimiento: MovimientoFinancieroBase, db: Session = Depends(get_db)):
+    nuevo_movimiento = movimiento.model_dump()
     
-    movimientoFinanciero = conn.execute(movimiento_financiero.select().where(movimiento_financiero.c.id == inserted_id)).first()._mapping
-    return movimientoFinanciero
-   
+    insert_statement = movimiento_financiero.insert().values(nuevo_movimiento).returning(movimiento_financiero)
+    result = db.execute(insert_statement)
+    db.commit()
+    
+    new_movimiento = result.first()
+    if not new_movimiento:
+        raise HTTPException(status_code=500, detail="No se pudo crear el movimiento financiero.")
+    
+    return new_movimiento._mapping
 
-@movimientoFinanciero.get("/movimientoFinanciero/{id}", response_model = MovimientoFinanciero)
-def get_movimientoFinanciero(id: int):
-    movimientoFinanciero = conn.execute(movimiento_financiero.select().where(movimiento_financiero.c.id == id)).first()
-    if movimientoFinanciero:
-        return movimientoFinanciero._mapping
-    raise HTTPException(status_code = 404, detail= "Movimiento Financiero no encontrado")
+@movimientoFinanciero.get("/movimientoFinanciero/{id}", response_model=MovimientoFinanciero)
+def get_movimientoFinanciero(id: int, db: Session = Depends(get_db)):
+    result = db.execute(movimiento_financiero.select().where(movimiento_financiero.c.id == id)).first()
+    if result:
+        return result._mapping
+    raise HTTPException(status_code=404, detail="Movimiento Financiero no encontrado")
 
-@movimientoFinanciero.put("/movimientoFinanciero/{id}", response_model = MovimientoFinanciero)
-def update(id: int, movimiento: MovimientoFinancieroBase):
-    result = conn.execute(movimiento_financiero.update().values(
-                                            usuario_id = movimiento.usuario_id,
-                                            categoria_id = movimiento.categoria_id,
-                                            fecha = movimiento.fecha,
-                                            tipo = movimiento.tipo,
-                                            concepto = movimiento.concepto,
-                                            monto_presupuestado = movimiento.monto_presupuestado,
-                                            monto_real = movimiento.monto_real).where(movimiento_financiero.c.id == id))
-    conn.commit()
+@movimientoFinanciero.put("/movimientoFinanciero/{id}", response_model=MovimientoFinanciero)
+def update(id: int, movimiento: MovimientoFinancieroBase, db: Session = Depends(get_db)):
+    result = db.execute(movimiento_financiero.update().values(movimiento.model_dump()).where(movimiento_financiero.c.id == id))
+    db.commit()
 
     if result.rowcount == 0:
         raise HTTPException(status_code=404, detail="Movimiento Financiero no encontrado")
 
-    result = conn.execute(movimiento_financiero.select().where(movimiento_financiero.c.id == id)).first()._mapping
-    return result
+    updated_movimiento = db.execute(movimiento_financiero.select().where(movimiento_financiero.c.id == id)).first()
+    return updated_movimiento._mapping
 
-@movimientoFinanciero.delete("/movimientoFinanciero/{id}", status_code = status.HTTP_204_NO_CONTENT)
-def delete(id: int):
-    result = conn.execute(movimiento_financiero.delete().where(movimiento_financiero.c.id == id))
-    conn.commit()
+@movimientoFinanciero.delete("/movimientoFinanciero/{id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete(id: int, db: Session = Depends(get_db)):
+    result = db.execute(movimiento_financiero.delete().where(movimiento_financiero.c.id == id))
+    db.commit()
 
     if result.rowcount == 0:
-        raise HTTPException(status_code =  404, detail = "Movimiento Financiero no encotrado")
-    return Response(status_code = HTTP_204_NO_CONTENT)
+        raise HTTPException(status_code=404, detail="Movimiento Financiero no encontrado")
+    return Response(status_code=HTTP_204_NO_CONTENT)
 
+# ... (Las demás funciones como calcular_estado_financiero también deben usar 'db: Session = Depends(get_db)' y 'db.execute')
+# Ejemplo para calcular_estado_financiero:
 @movimientoFinanciero.get("/estado_financiero", response_model=EstadoFinancieroResponse)
 def calcular_estado_financiero(
     usuario_id: int,
+    db: Session = Depends(get_db),
     fecha_inicio: Optional[date] = Query(None),
     fecha_fin: Optional[date] = Query(None)
 ):
@@ -95,7 +77,7 @@ def calcular_estado_financiero(
                 movimiento_financiero.c.fecha.between(fecha_inicio, fecha_fin)
             )
 
-        movimientos = conn.execute(query).fetchall()
+        movimientos = db.execute(query).fetchall()
 
         if not movimientos:
             raise HTTPException(status_code=404, detail="No se encontraron movimientos para este usuario.")
@@ -122,7 +104,7 @@ def calcular_estado_financiero(
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error interno: {str(e)}")
-
+        
 @movimientoFinanciero.get("/resumen_mensual")
 def resumen_mensual(usuario_id: int, anio: int, mes: int):
     try:
@@ -139,7 +121,7 @@ def resumen_mensual(usuario_id: int, anio: int, mes: int):
             movimiento_financiero.c.fecha < fecha_fin
         )
 
-        movimientos = conn.execute(query).fetchall()
+        movimientos = engine.connect().execute(query).fetchall()
 
         if not movimientos:
             raise HTTPException(status_code=404, detail="No se encontraron movimientos para este mes.")

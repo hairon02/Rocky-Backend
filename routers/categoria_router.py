@@ -1,42 +1,34 @@
-from fastapi import APIRouter, Response, status, HTTPException, Query, Depends
-from config.db import conn, Session, get_db
+# routers/categoria_router.py
+from fastapi import APIRouter, Response, status, HTTPException, Depends
+from sqlalchemy.orm import Session
+from config.db import get_db
 from models.categoria import categoria
 from schemas.categoria import Categoria
-from starlette.status import HTTP_204_NO_CONTENT
-from datetime import date
-from typing import Optional
-from sqlalchemy.orm import Session as ss
-from sqlalchemy import asc
-
+from typing import List
 
 categoria_router = APIRouter()
 
-
-@categoria_router.get("/categoria", response_model=list[Categoria])
-def get_categorias():
-    with Session() as session:
-        result = session.execute(categoria.select()).fetchall()
-        categorias_list = [row._mapping for row in result]
-        return categorias_list
-
+@categoria_router.get("/categoria", response_model=List[Categoria])
+def get_categorias(db: Session = Depends(get_db)):
+    result = db.execute(categoria.select()).fetchall()
+    categorias_list = [row._mapping for row in result]
+    return categorias_list
 
 @categoria_router.post("/categoria", response_model=Categoria)
-def create_categoria(cat: Categoria, db: ss = Depends(get_db)):
+def create_categoria(cat: Categoria, db: Session = Depends(get_db)):
     nuevo = {"categoria": cat.categoria}
-    result = db.execute(categoria.insert().values(nuevo))
+    result = db.execute(categoria.insert().values(nuevo).returning(categoria))
     db.commit()
 
-    inserted_id = result.inserted_primary_key[0]
+    inserted_categoria = result.first()
+    if not inserted_categoria:
+        raise HTTPException(status_code=500, detail="No se pudo crear la categoría")
 
-    categoria_one = db.execute(
-        categoria.select().where(categoria.c.id == inserted_id)
-    ).first()
-
-    return categoria_one._mapping
+    return inserted_categoria._mapping
 
 @categoria_router.get("/categoria/{id}", response_model=Categoria)
-def get_UnoCategoria(id:int):
-    result = conn.execute(categoria.select().where(categoria.c.id == id)).first()
+def get_UnoCategoria(id: int, db: Session = Depends(get_db)):
+    result = db.execute(categoria.select().where(categoria.c.id == id)).first()
     if result:
         return result._mapping
-    raise HTTPException(status_code = 404, detail= "Categoria no encontrado")
+    raise HTTPException(status_code=404, detail="Categoria no encontrada")
