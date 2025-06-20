@@ -8,17 +8,14 @@ load_dotenv()
 database_url = os.getenv("DATABASE_URL")
 
 if database_url:
-    # 🔧 Corrige el esquema para SQLAlchemy
     if database_url.startswith("postgres://"):
         database_url = database_url.replace("postgres://", "postgresql+psycopg2://", 1)
 
-    # ✅ Agrega sslmode=require si no está presente
     if "sslmode=" not in database_url:
         separator = "&" if "?" in database_url else "?"
         database_url += f"{separator}sslmode=require"
 
 else:
-    # Configuración local (MySQL por ejemplo)
     user = os.getenv("USER")
     password = os.getenv("PASSWORD", "")
     host = os.getenv("DATABASE_HOST")
@@ -26,9 +23,7 @@ else:
     name = os.getenv("DATABASE_NAME")
     database_url = f"mysql+pymysql://{user}:{password}@{host}:{port}/{name}"
 
-# Debug opcional
-print("📡 DB URL usada:", database_url)
-
+# 👇 Aquí se usa el database_url ya corregido
 engine = create_engine(database_url)
 Session = sessionmaker(bind=engine)
 meta = MetaData()
