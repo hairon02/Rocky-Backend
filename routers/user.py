@@ -43,13 +43,19 @@ def create_user(user: User):
 
     new_user = {"username": user.username, "nombre": user.nombre, "apellido": user.apellido, "email": user.email}  # uso de diccionarios
     new_user["password"] = hash_password(user.password)
-    result = conn.execute(users.insert().values(new_user))
+    
+    # Modificación clave: Usar returning() para obtener la fila insertada directamente
+    insert_statement = users.insert().values(new_user).returning(users)
+    result = conn.execute(insert_statement)
     conn.commit()
 
-    user_dict = conn.execute(users.select().where(users.c.id == result.lastrowid)).first()
-    # Convertir el resultado a un diccionario antes de devolverlo
-    inserted_user_dict = dict(user_dict._asdict())
-    return inserted_user_dict
+    # El resultado ya es la fila insertada, no necesitamos otra consulta
+    inserted_user = result.first()
+    if inserted_user:
+        return inserted_user._mapping
+    
+    # Fallback por si algo extremadamente raro ocurre
+    raise HTTPException(status_code=500, detail="No se pudo crear el usuario.")
 
 
 @user.get("/users/{id}", response_model=User)
